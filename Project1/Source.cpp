@@ -286,7 +286,21 @@ bool mdel(CSocket * _pSocket, char filenames[STR_LENGTH])
 	delete filenames;
 	return FALSE;
 }
-bool cd(CSocket * _pSocket)
+bool cd(CSocket * _pSocket, char dir)
 {
+	char buf[BUFSIZ];
+
+	if(dir == NULL)
+	{
+		dir = new char[STR_LENGTH];
+		cout<<"Directory ";
+		cin >> dir;
+	}
+
+	memset(buf, 0, BUFSIZE);
+	sprintf(buf, "CWD %s\r\n", dir);
+	SendCommand(_pSocket, buf);
+	cout << buf;
+	delete dir;
 	return TRUE;
 }
