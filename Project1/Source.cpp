@@ -1,31 +1,16 @@
 #include "Header.h"
 #include <afxsock.h>
 #include <iostream>
+#include <cstring>
+#include <conio.h>
+
 
 
 using namespace std;
 
-DWORD WINAPI CommandThread(LPVOID)
+
+DWORD WINAPI DataThread(LPVOID, CSocket* s)
 {
-	CSocket* ClientSocket = new CSocket;
-	login(ClientSocket);
-	ls(ClientSocket);
-	ClientSocket->Close();
-	return 0;
-}
-
-DWORD WINAPI DataThread(LPVOID)
-{
-	CSocket* DataSocket = new CSocket;
-	DataSocket->Create(52380, 1, (LPCTSTR)0);
-	establishDataConnection(DataSocket, 1);
-
-	char buf[BUFSIZ + 1];
-	memset(buf, 0, sizeof buf);
-	DataSocket->Receive(buf, BUFSIZ, 0);
-	cout << buf;
-
-	DataSocket->Close();
 	return 0;
 }
 
@@ -51,18 +36,15 @@ int main()
 			}
 			//
 			//Code from here
-			DWORD dwCommandThread;
-			DWORD dwDataThread;
 
-			HANDLE hCommandThread;
-			HANDLE hDataThread;
+			CSocket* ClientSocket = new CSocket;
+			CSocket* DataSocket = new CSocket;
+			
+			login(ClientSocket);
+			del(ClientSocket, "n.jpg");
+			mdel(ClientSocket);
 
-			hDataThread = CreateThread(NULL, 0, DataThread, NULL, 0, &dwDataThread);
-			hCommandThread = CreateThread(NULL, 0, CommandThread, NULL, 0, &dwCommandThread);
-
-
-
-
+			ClientSocket->Close();
 			//Code above
 		}
 	}
@@ -149,15 +131,26 @@ bool login(CSocket* _pSocket)
 	}
 	cout << buf;
 }
-bool ls(CSocket* _pSocket)
+bool ls(CSocket* _pSocket, CSocket* _pDataSocket)
 {
 	char buf[BUFSIZ + 1];
 	int tmpres, codeftp;
 
+	//Find port of _pSocket
+	CString SockAdrr;
+	UINT SockPort;
+	_pSocket->GetSockName(SockAdrr, SockPort);
+	int x = SockPort / 255;
+	int y = SockPort % 255 + 1;
+
 	//Send PORT command
+	char IP[BUFSIZ + 1];
+	memset(IP, 0, sizeof IP);
+	sprintf(IP, "127,0,0,1,%d,%d", x, y);
 	memset(buf, 0, sizeof buf);
-	sprintf(buf, "PORT %s\r\n", "127,0,0,1,205,105");
+	sprintf(buf, "PORT %s\r\n", IP);
 	_pSocket->Send(buf, strlen(buf), 0);
+
 	//receive command
 	memset(buf, 0, sizeof buf);
 	_pSocket->Receive(buf, BUFSIZ, 0);
@@ -169,14 +162,26 @@ bool ls(CSocket* _pSocket)
 		//exit(1);
 	}
 	cout << buf;
+	
+	//Listen on port SockPort + 1
+	_pDataSocket->Create(SockPort + 1);
+	if (_pDataSocket->Listen(1) == FALSE)
+	{
+		cout << "Khong the lang nghe tren port nay !!!" << endl;
+		_pDataSocket->Close();
+		return FALSE;
+	}
+	//Accept on port SockPort + 1
 
 	//Send NLTS command
 	memset(buf, 0, sizeof buf);
 	sprintf(buf, "NLST\r\n");
+
 	_pSocket->Send(buf, strlen(buf), 0);
+
 	memset(buf, 0, sizeof buf);
 	_pSocket->Receive(buf, BUFSIZ, 0);
-	cout << buf;
+
 	sscanf(buf, "%d", &codeftp);
 	if (codeftp != 150)
 	{
@@ -184,8 +189,15 @@ bool ls(CSocket* _pSocket)
 		return FALSE;
 		//exit(1);
 	}
+	cout << buf;
+
+	CSocket tmpPort;
+	_pDataSocket->Accept(tmpPort);
 	memset(buf, 0, sizeof buf);
-	_pSocket->Receive(buf, BUFSIZ, 0);
+	tmpPort.Receive(buf, BUFSIZ, 0);
+	cout << buf;
+
+
 	sscanf(buf, "%d", &codeftp);
 	if (codeftp != 226)
 	{
@@ -194,55 +206,87 @@ bool ls(CSocket* _pSocket)
 		//exit(1);
 	}
 	cout << buf;
+	_pDataSocket->Close();
 	return TRUE;
 }
 
-void replylogcode(int code)
+bool del(CSocket * _pSocket, char filename[STR_LENGTH])
 {
-	switch (code) {
-	case 200:
-		printf("Command okay");
-		break;
-	case 425:
-		printf("425 Can't open data connection for transfer of /");
-		break;
-	case 500:
-		printf("Syntax error, command unrecognized.");
-		printf("This may include errors such as command line too long.");
-		break;
-	case 501:
-		printf("Syntax error in parameters or arguments.");
-		break;
-	case 202:
-		printf("Command not implemented, superfluous at this site.");
-		break;
-	case 502:
-		printf("Command not implemented.");
-		break;
-	case 503:
-		printf("Bad sequence of commands.");
-		break;
-	case 530:
-		printf("Not logged in!");
-		break;
+	char buf[BUFSIZ + 1];
+	int tmpres, ftpcode;
+
+	//Chuan bi lenh de gui
+	if (filename == NULL)
+	{
+		filename = new char[STR_LENGTH];
+		memset(filename, 0, sizeof filename);
+		cout << "Filename: ";
+		cin >> filename;
 	}
-	printf("\n");
+
+	//Gui lenh DELE <filename>\r\n
+	memset(buf, 0, sizeof buf);
+	sprintf(buf, "DELE %s\r\n", filename);
+	SendCommand(_pSocket, buf);
+	sscanf(buf, "%d", &ftpcode);
+	cout << buf;
+	if (ftpcode != 250)
+	{
+		replylogcode(ftpcode);
+		return FALSE;
+	}
+	delete filename;
+	return TRUE;
 }
-bool establishDataConnection(CSocket* _pSocket, bool mode)
+bool mdel(CSocket * _pSocket, char filenames[STR_LENGTH])
 {
-	if (mode)
+	char buf[BUFSIZ + 1];
+	int tmpres, ftpcode;
+	
+	char* filename[5];
+
+	if (filenames == NULL)
 	{
-		if (_pSocket->Listen(1) == FALSE)
+		//char filenames[STR_LENGTH];
+		filenames = new char[STR_LENGTH];
+		cin.ignore();
+		cout << "Filenames: ";
+		cin.getline(filenames, 256);
+	}
+
+	filename[0] = strtok(filenames, " ,-");
+
+	int i = 1;
+	while (i < 5)
+	{
+		filename[i] = strtok(NULL, " ,-");
+		
+		if (filename[i] == NULL) break;
+		i++;
+	}
+	
+	for (int j = 0; j < i; j++)
+	{
+		char permission;
+		cout << "Delete " << filename[j] << "? (Y/n): ";
+		permission = _getch();
+		if (permission == 'Y' || permission == 'y')
 		{
-			cout << "Cannot listen on this Socket!\n";
-			return FALSE;
+			memset(buf, 0, BUFSIZE);
+			sprintf(buf, "DELE %s\r\n", filename[j]);
+			SendCommand(_pSocket, buf);
+			cout << endl << buf;
+			memset(buf, 0, BUFSIZE);
 		}
-		_pSocket->Accept(*_pSocket);
-		cout << "Connection established!\n";
-		return TRUE;
+		else
+		{
+			continue;
+		}
 	}
-	else
-	{
-		return TRUE;
-	}
+	delete filenames;
+	return FALSE;
+}
+bool cd(CSocket * _pSocket)
+{
+	return TRUE;
 }
