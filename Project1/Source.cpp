@@ -40,10 +40,11 @@ int main()
 			CSocket* ClientSocket = new CSocket;
 			CSocket* DataSocket = new CSocket;
 			
-			login(ClientSocket);
-			del(ClientSocket, "n.jpg");
-			mdel(ClientSocket);
-
+			//login(ClientSocket);
+			//lcd();
+			system("dir");
+			system("cd D:\\Projects\r\n\n");
+			
 			ClientSocket->Close();
 			//Code above
 		}
@@ -213,7 +214,6 @@ bool ls(CSocket* _pSocket, CSocket* _pDataSocket)
 bool del(CSocket * _pSocket, char filename[STR_LENGTH])
 {
 	char buf[BUFSIZ + 1];
-	int tmpres, ftpcode;
 
 	//Chuan bi lenh de gui
 	if (filename == NULL)
@@ -228,21 +228,14 @@ bool del(CSocket * _pSocket, char filename[STR_LENGTH])
 	memset(buf, 0, sizeof buf);
 	sprintf(buf, "DELE %s\r\n", filename);
 	SendCommand(_pSocket, buf);
-	sscanf(buf, "%d", &ftpcode);
 	cout << buf;
-	if (ftpcode != 250)
-	{
-		replylogcode(ftpcode);
-		return FALSE;
-	}
+
 	delete filename;
 	return TRUE;
 }
 bool mdel(CSocket * _pSocket, char filenames[STR_LENGTH])
 {
-	char buf[BUFSIZ + 1];
-	int tmpres, ftpcode;
-	
+	char buf[BUFSIZ + 1];	
 	char* filename[5];
 
 	if (filenames == NULL)
@@ -260,7 +253,6 @@ bool mdel(CSocket * _pSocket, char filenames[STR_LENGTH])
 	while (i < 5)
 	{
 		filename[i] = strtok(NULL, " ,-");
-		
 		if (filename[i] == NULL) break;
 		i++;
 	}
@@ -286,7 +278,7 @@ bool mdel(CSocket * _pSocket, char filenames[STR_LENGTH])
 	delete filenames;
 	return FALSE;
 }
-bool cd(CSocket * _pSocket, char dir)
+bool cd(CSocket * _pSocket, char dir[STR_LENGTH])
 {
 	char buf[BUFSIZ];
 
@@ -304,3 +296,18 @@ bool cd(CSocket * _pSocket, char dir)
 	delete dir;
 	return TRUE;
 }
+
+bool lcd(char dir[STR_LENGTH])
+{
+	char buf[BUFSIZ + 1];
+	if (dir == NULL)
+	{
+		dir = new char[STR_LENGTH];
+		cout << "Directory ";
+		cin >> dir;
+	}
+	sprintf(buf, "cd %s\r\n", dir);
+	system(buf);
+	return TRUE;
+}
+
