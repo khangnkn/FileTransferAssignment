@@ -24,7 +24,7 @@ int main()
 		{
 			if (AfxSocketInit() == FALSE)
 			{
-				cout << "Khong the khoi tao Socket Libraray";
+				cout << "Khong the khoi tao Socket Library";
 				return FALSE;
 			}
 			ftp_client Client;

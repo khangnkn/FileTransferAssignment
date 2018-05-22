@@ -145,6 +145,9 @@
   <ItemGroup>
     <ClInclude Include="ftp_client.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="dataBuffer.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
