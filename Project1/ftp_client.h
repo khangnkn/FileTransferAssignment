@@ -25,6 +25,8 @@ using namespace std;
 #define CODE_MKDIR 11
 #define CODE_RMDIR 12
 #define CODE_PWD 13
+#define CODE_PASSIVE 14
+#define CODE_ACTIVE 142
 #define CODE_QUIT 15
 
 class ftp_client
@@ -52,11 +54,14 @@ public:
 	bool Mkdir(char directory[STR_LENGTH] = NULL);
 	bool Rmdir(char directory[STR_LENGTH] = NULL);
 	bool Pwd();
+	void Passive();
+	void Active();
 	bool Quit();
 	~ftp_client();
 private:
 	bool SendCommand();
 	bool dataTvAM(bool stream);
+	bool dataTvPM(bool stream);
 	int CommandHandler(char command[]);
 	bool checkFTPCode(int code);
 };

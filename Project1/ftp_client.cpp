@@ -68,6 +68,12 @@ void ftp_client::UserHandler()
 		case CODE_PWD:
 			this->Pwd();
 			break;
+		case CODE_PASSIVE:
+			this->Passive();
+			break;
+		case CODE_ACTIVE:
+			this->Active();
+			break;
 		case CODE_QUIT:
 			this->Quit();
 			return;
@@ -104,6 +110,10 @@ int ftp_client::CommandHandler(char command[])
 		return CODE_RMDIR;
 	if (!strcmp(command, "pwd"))
 		return CODE_PWD;
+	if (!strcmp(command, "passive"))
+		return CODE_PASSIVE;
+	if (!strcmp(command, "active"))
+		return CODE_ACTIVE;
 	if (!strcmp(command, "quit"))
 		return CODE_QUIT;
 	return CODE_ERROR;
@@ -113,7 +123,7 @@ bool ftp_client::Connect(wchar_t IPAddr[])
 {
 	if (_pSocket->Connect(IPAddr, PORT) != 0)
 	{
-		cout << "Ket noi den Server thanh cong!\n";
+		cout << "Successfully connect to FTP Server!\n";
 		return TRUE;
 	}
 	else
@@ -187,10 +197,23 @@ bool ftp_client::Login(wchar_t IPAddr[STR_LENGTH])
 
 bool ftp_client::Ls()
 {
-	dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	if (dBuffer.is_open() == FALSE)
+		dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	else
+	{
+		dBuffer.close();
+		dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	}
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "NLST\r\n");
-	if (!this->dataTvAM(0)) return FALSE;
+	if (isPassive == 0)
+	{
+		if (!this->dataTvAM(0)) return FALSE;
+	}
+	else
+	{
+		if (!this->dataTvPM(0)) return FALSE;
+	}
 
 	dBuffer.clear();
 	dBuffer.seekg(0, ios::beg);
@@ -205,11 +228,24 @@ bool ftp_client::Ls()
 
 bool ftp_client::Dir()
 {
-	dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	if(dBuffer.is_open() == FALSE)
+		dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	else
+	{
+		dBuffer.close();
+		dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	}
+	cout << "\nGet here!\n";
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "LIST\r\n");
-	if (!this->dataTvAM(0)) return FALSE;
-
+	if (isPassive == 0)
+	{
+		if (!this->dataTvAM(0)) return FALSE;
+	}
+	else
+	{
+		if (!this->dataTvPM(0)) return FALSE;
+	}
 	dBuffer.clear();
 	dBuffer.seekg(0, ios::beg);
 	stringstream buffer;
@@ -223,7 +259,13 @@ bool ftp_client::Dir()
 
 bool ftp_client::Put(char src_filename[STR_LENGTH], char dest_filename[STR_LENGTH])
 {
-	dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	if (dBuffer.is_open() == FALSE)
+		dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	else
+	{
+		dBuffer.close();
+		dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	}
 	if (src_filename == NULL)
 	{
 		src_filename = new char[STR_LENGTH];
@@ -250,11 +292,17 @@ bool ftp_client::Put(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 		dBuffer.write(buff, 1024);
 		memset(buff, 0, BUFSIZE);
 	}
-	cout << "Filesize " << dBuffer.tellg();
+	cout << "Filesize " << dBuffer.tellg() << "bytes\n";
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "STOR %s\r\n", dest_filename);
-	if (!this->dataTvAM(1)) return FALSE;
-
+	if (isPassive == 0)
+	{
+		if (!this->dataTvAM(1)) return FALSE;
+	}
+	else
+	{
+		if (!this->dataTvPM(1)) return FALSE;
+	}
 	fout.close();
 	dBuffer.close();
 	return TRUE;
@@ -262,7 +310,13 @@ bool ftp_client::Put(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 
 bool ftp_client::Get(char src_filename[STR_LENGTH], char dest_filename[STR_LENGTH])
 {
-	dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	if (dBuffer.is_open() == FALSE)
+		dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	else
+	{
+		dBuffer.close();
+		dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
+	}
 	if (src_filename == NULL)
 	{
 		src_filename = new char[STR_LENGTH];
@@ -279,8 +333,14 @@ bool ftp_client::Get(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 	}
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "RETR %s\r\n", src_filename);
-	if (!this->dataTvAM(0)) return FALSE;
-
+	if (isPassive == 0)
+	{
+		if (!this->dataTvAM(0)) return FALSE;
+	}
+	else
+	{
+		if (!this->dataTvPM(0)) return FALSE;
+	}
 	fstream fin;
 	fin.open(dest_filename, ios::out | ios::binary);
 	dBuffer.clear();
@@ -295,12 +355,10 @@ bool ftp_client::Get(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 
 bool ftp_client::MPut(char filenames[STR_LENGTH])
 {
-//	dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
-	char* filename[5];
+	char* filename[8];
 
 	if (filenames == NULL)
 	{
-		//char filenames[STR_LENGTH];
 		filenames = new char[STR_LENGTH];
 		cin.ignore();
 		cout << "Filenames: ";
@@ -310,7 +368,7 @@ bool ftp_client::MPut(char filenames[STR_LENGTH])
 	filename[0] = strtok(filenames, " ,-");
 
 	int i = 1;
-	while (i < 5)
+	while (i < 8)
 	{
 		filename[i] = strtok(NULL, " ,-");
 		if (filename[i] == NULL) break;
@@ -324,21 +382,16 @@ bool ftp_client::MPut(char filenames[STR_LENGTH])
 		cin >> dst_filename;
 		this->Put(filename[j], dst_filename);
 	}
-	delete filenames;
-
-//	dBuffer.close();
-	
+	delete filenames;	
 	return FALSE;
 }
 
 bool ftp_client::MGet(char filenames[STR_LENGTH])
 {
-//	dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
-	char* filename[5];
+	char* filename[8];
 
 	if (filenames == NULL)
 	{
-		//char filenames[STR_LENGTH];
 		filenames = new char[STR_LENGTH];
 		cin.ignore();
 		cout << "Filenames: ";
@@ -348,7 +401,7 @@ bool ftp_client::MGet(char filenames[STR_LENGTH])
 	filename[0] = strtok(filenames, " ,-");
 
 	int i = 1;
-	while (i < 5)
+	while (i < 8)
 	{
 		filename[i] = strtok(NULL, " ,-");
 		if (filename[i] == NULL) break;
@@ -363,13 +416,8 @@ bool ftp_client::MGet(char filenames[STR_LENGTH])
 		this->Get(filename[j], dst_filename);
 	}
 	delete filenames;
-
-//	dBuffer.close();
-	
 	return FALSE;
 }
-
-
 
 bool ftp_client::Del(char filename[STR_LENGTH])
 {
@@ -392,7 +440,7 @@ bool ftp_client::Del(char filename[STR_LENGTH])
 
 bool ftp_client::MDel(char filenames[STR_LENGTH])
 {
-	char* filename[5];
+	char* filename[8];
 
 	if (filenames == NULL)
 	{
@@ -406,7 +454,7 @@ bool ftp_client::MDel(char filenames[STR_LENGTH])
 	filename[0] = strtok(filenames, " ,-");
 
 	int i = 1;
-	while (i < 5)
+	while (i < 8)
 	{
 		filename[i] = strtok(NULL, " ,-");
 		if (filename[i] == NULL) break;
@@ -497,6 +545,16 @@ bool ftp_client::Pwd()
 	return TRUE;
 }
 
+void ftp_client::Passive()
+{
+	this->isPassive = 1;
+}
+
+void ftp_client::Active()
+{
+	this->isPassive = 0;
+}
+
 bool ftp_client::Quit()
 {
 	sprintf(buf, "QUIT\r\n");
@@ -530,23 +588,21 @@ bool ftp_client::dataTvAM(bool stream)
 	char t_buf[BUFSIZ + 1];
 	sprintf(t_buf, "%s", buf);
 
-	dtSocket.Create(0U, SOCK_STREAM, _T("127.0.0.1"));
-	dtSocket.Listen(1);
+	if (dtSocket.Create(0U, SOCK_STREAM, _T("127.0.0.1")) == 0) return FALSE;
+	if (dtSocket.Listen(5) == 0) return FALSE;
 
-	dtSocket.GetSockName(dtIPAddr, dtPort);
+	if (dtSocket.GetSockName(dtIPAddr, dtPort) == 0) return FALSE;
 	int x = dtPort / 256;
 	int y = dtPort % 256;
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "PORT 127,0,0,1,%d,%d\r\n", x, y);
-	if (!this->SendCommand())
-		return FALSE;
+	if (!this->SendCommand()) return FALSE;
 	if (!checkFTPCode(200)) return FALSE;
 
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "%s", t_buf);
 
-	if (!this->SendCommand())
-		return FALSE;
+	if (!this->SendCommand()) return FALSE;
 	if (!checkFTPCode(150)) return FALSE;
 
 	memset(buf, 0, BUFSIZE);
@@ -574,14 +630,70 @@ bool ftp_client::dataTvAM(bool stream)
 			memset(buf, 0, BUFSIZE);
 		} while (buf_count <= 0 && buf_count != SOCKET_ERROR);
 	}
+
 	tmpSock.Close();
+	dtSocket.Close();
+
+	memset(buf, 0, BUFSIZE);
+	if (this->_pSocket->Receive(buf, BUFSIZ, 0) == 0) return FALSE;
+	if (!checkFTPCode(226)) return FALSE;
+
+	cout << buf;
+	return TRUE;
+}
+
+bool ftp_client::dataTvPM(bool stream)
+{
+	CSocket dtSocket;
+	int IPAddr[4];
+	int Port[2];
+
+	char t_buf[BUFSIZ + 1];
+	sprintf(t_buf, "%s", buf);
+
+	sprintf(buf, "PASV\r\n");
+	if (!this->SendCommand()) return FALSE;
+	if (!checkFTPCode(227)) return FALSE;
+
+	sscanf(buf, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)\r\n", &IPAddr[0], &IPAddr[1], &IPAddr[2], &IPAddr[3], &Port[0], &Port[1]);
+
+	int nPort = Port[0] * 256 + Port[1];
+
+	if (dtSocket.Create() == 0) return FALSE;
+	if (dtSocket.Connect(_T("127.0.0.1"), nPort) == 0) return FALSE;
+
+	memset(buf, 0, BUFSIZE);
+	sprintf(buf, "%s", t_buf);
+	if (!this->SendCommand()) return FALSE;
+	//if (!checkFTPCode(150)) return FALSE;
+	if (stream == 0)
+	{
+		int buf_count;
+		buf_count = dtSocket.Receive(buf, BUFSIZ, 0);
+		while (buf_count != 0)
+		{
+			dBuffer.write(buf, buf_count);
+			memset(buf, 0, BUFSIZE);
+			buf_count = dtSocket.Receive(buf, BUFSIZ, 0);
+		}
+	}
+	else
+	{
+		int buf_count;
+		memset(buf, 0, BUFSIZE);
+		do
+		{
+			dBuffer.read(buf, BUFSIZ);
+			buf_count = dtSocket.Send(buf, BUFSIZ, 0);
+			memset(buf, 0, BUFSIZE);
+		} while (buf_count <= 0 && buf_count != SOCKET_ERROR);
+	}
 	dtSocket.Close();
 
 	memset(buf, 0, BUFSIZE);
 	if (!this->_pSocket->Receive(buf, BUFSIZ, 0)) return FALSE;
 	if (!checkFTPCode(226)) return FALSE;
 	cout << buf;
-	cout << dBuffer.tellg() << " bytes receive successfully\n";
 	return TRUE;
 }
 
