@@ -1,9 +1,9 @@
 111
 CSocket.pdf
 dir1
+FTP.zip
 khang
 kk
 msd.txt
-nkk.png
 nkkk.png
 y5.MP3

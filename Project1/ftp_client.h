@@ -4,6 +4,7 @@
 #include <conio.h>
 #include <fstream>
 #include <sstream>
+#include <direct.h>
 using namespace std;
 
 #define STR_LENGTH 256
@@ -11,6 +12,8 @@ using namespace std;
 #define BUFSIZE sizeof(buf)
 #define PORT 21
 #define IP _T("127.0.0.1")
+#define DOWNSTREAM 0
+#define UPSTREAM  1
 #define	CODE_ERROR -1
 #define CODE_OPEN 0
 #define CODE_LS 21
@@ -20,6 +23,7 @@ using namespace std;
 #define CODE_MPUT 5
 #define CODE_MGET 6
 #define CODE_CD 7
+#define CODE_LCD 8
 #define CODE_DELETE 9
 #define CODE_MDELETE 10
 #define CODE_MKDIR 11
@@ -51,6 +55,7 @@ public:
 	bool Del(char filename[STR_LENGTH] = NULL);
 	bool MDel(char filenames[STR_LENGTH] = NULL);
 	bool Cd(char directory[STR_LENGTH] = NULL);
+	bool Lcd(char directory[STR_LENGTH] = NULL);
 	bool Mkdir(char directory[STR_LENGTH] = NULL);
 	bool Rmdir(char directory[STR_LENGTH] = NULL);
 	bool Pwd();

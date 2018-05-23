@@ -1,16 +1,20 @@
 #include "ftp_client.h"
 
 
-
+/*Initialize ftp_client
+> Create new socket
+> Set tranmission mode to active as default*/
 ftp_client::ftp_client()
 {
 	_pSocket = new CSocket;
 	memset(buf, 0, BUFSIZE);
 	_pSocket->Create();
 	isPassive = 0;
-	//dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
 }
 
+/*Process user interface
+> Receive user commands
+> Make function calls*/
 void ftp_client::UserHandler()
 {
 	char command[STR_LENGTH];
@@ -37,6 +41,9 @@ void ftp_client::UserHandler()
 			break;
 		case CODE_CD:
 			this->Cd();
+			break;
+		case CODE_LCD:
+			this->Lcd();
 			break;
 		case CODE_DIR:
 			this->Dir();
@@ -81,6 +88,8 @@ void ftp_client::UserHandler()
 	} while (TRUE);
 }
 
+/*Process user commands
+> return CODE of each command*/
 int ftp_client::CommandHandler(char command[])
 {
 	
@@ -92,6 +101,8 @@ int ftp_client::CommandHandler(char command[])
 		return CODE_DIR;
 	if (!strcmp(command, "cd"))
 		return CODE_CD;
+	if (!strcmp(command, "lcd"))
+		return CODE_LCD;
 	if (!strcmp(command, "get"))
 		return CODE_GET;
 	if (!strcmp(command, "put"))
@@ -119,6 +130,7 @@ int ftp_client::CommandHandler(char command[])
 	return CODE_ERROR;
 }
 
+/*Connect to server*/
 bool ftp_client::Connect(wchar_t IPAddr[])
 {
 	if (_pSocket->Connect(IPAddr, PORT) != 0)
@@ -132,6 +144,7 @@ bool ftp_client::Connect(wchar_t IPAddr[])
 	}
 }
 
+/*Login to FTP server*/
 bool ftp_client::Login(wchar_t IPAddr[STR_LENGTH])
 {
 	if (IPAddr == NULL)
@@ -153,11 +166,9 @@ bool ftp_client::Login(wchar_t IPAddr[STR_LENGTH])
 		while ((tmpresult = _pSocket->Receive(buf, BUFSIZ, 0)) > 0)
 		{
 			sscanf(buf, "%d", &codeftp);
-			//printf("%s", buf);
 			cout << buf;
 			if (codeftp != 220) //120, 240, 421: something wrong
 			{
-				//replylogcode(codeftp);
 				return FALSE;
 			}
 
@@ -195,6 +206,11 @@ bool ftp_client::Login(wchar_t IPAddr[STR_LENGTH])
 	delete IPAddr;
 }
 
+/*List file from selected directory on server
+> Open dataBuffer.txt. This buffer is to receive data from server
+> Prepare NLST command
+> Check if tranmission mode is active or passive then use dataTvAM of dataTvPM
+> Put data from dataBuffer to specific file with the right file type*/
 bool ftp_client::Ls()
 {
 	if (dBuffer.is_open() == FALSE)
@@ -208,11 +224,11 @@ bool ftp_client::Ls()
 	sprintf(buf, "NLST\r\n");
 	if (isPassive == 0)
 	{
-		if (!this->dataTvAM(0)) return FALSE;
+		if (!this->dataTvAM(DOWNSTREAM)) return FALSE;
 	}
 	else
 	{
-		if (!this->dataTvPM(0)) return FALSE;
+		if (!this->dataTvPM(DOWNSTREAM)) return FALSE;
 	}
 
 	dBuffer.clear();
@@ -235,7 +251,6 @@ bool ftp_client::Dir()
 		dBuffer.close();
 		dBuffer.open("dataBuffer.txt", ios::in | ios::out | ios::trunc | ios::binary);
 	}
-	cout << "\nGet here!\n";
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "LIST\r\n");
 	if (isPassive == 0)
@@ -277,7 +292,7 @@ bool ftp_client::Put(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 	{
 		dest_filename = new char[STR_LENGTH];
 		memset(dest_filename, 0, sizeof dest_filename);
-		cout << "Filename: ";
+		cout << "Destination filename: ";
 		cin >> dest_filename;
 	}
 
@@ -292,18 +307,20 @@ bool ftp_client::Put(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 		dBuffer.write(buff, 1024);
 		memset(buff, 0, BUFSIZE);
 	}
-	cout << "Filesize " << dBuffer.tellg() << "bytes\n";
+	cout << "Filesize: " << dBuffer.tellg() << "bytes\n";
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "STOR %s\r\n", dest_filename);
 	if (isPassive == 0)
 	{
-		if (!this->dataTvAM(1)) return FALSE;
+		if (!this->dataTvAM(UPSTREAM)) return FALSE;
 	}
 	else
 	{
-		if (!this->dataTvPM(1)) return FALSE;
+		if (!this->dataTvPM(UPSTREAM)) return FALSE;
 	}
+
 	fout.close();
+
 	dBuffer.close();
 	return TRUE;
 }
@@ -495,10 +512,28 @@ bool ftp_client::Cd(char directory[STR_LENGTH])
 
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "CWD %s\r\n", directory);
-	if (this->SendCommand() == FALSE)
-		return FALSE;
+	if (this->SendCommand() == FALSE) return FALSE;
 	if (!checkFTPCode(250)) return FALSE;
 	return false;
+}
+
+bool ftp_client::Lcd(char directory[STR_LENGTH])
+{
+	char dirbuf[BUFSIZ + 1];
+	if (directory == NULL)
+	{
+		_getcwd(dirbuf, sizeof dirbuf);
+		cout << dirbuf << endl;
+
+		directory = new char[BUFSIZ];
+		cout << "Directory ";
+		cin >> directory;
+		_chdir(directory);
+		_getcwd(dirbuf, sizeof dirbuf);
+	}
+
+	cout << dirbuf << endl;
+	return TRUE;
 }
 
 bool ftp_client::Mkdir(char directory[STR_LENGTH])
@@ -512,8 +547,7 @@ bool ftp_client::Mkdir(char directory[STR_LENGTH])
 
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "MKD %s\r\n", directory);
-	if (this->SendCommand() == FALSE)
-		return FALSE;
+	if (this->SendCommand() == FALSE) return FALSE;
 	if (!checkFTPCode(257)) return FALSE;
 	return TRUE;
 }
@@ -529,8 +563,7 @@ bool ftp_client::Rmdir(char directory[STR_LENGTH])
 
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "RMD %s\r\n", directory);
-	if (this->SendCommand() == FALSE)
-		return FALSE;
+	if (this->SendCommand() == FALSE) return FALSE;
 	if (!checkFTPCode(250)) return FALSE;
 	return TRUE;
 }
@@ -539,8 +572,7 @@ bool ftp_client::Pwd()
 {
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "PWD\r\n");
-	if (this->SendCommand() == FALSE)
-		return FALSE;
+	if (this->SendCommand() == FALSE) return FALSE;
 	if (!checkFTPCode(257)) return FALSE;
 	return TRUE;
 }
