@@ -16,7 +16,7 @@ ftp_client::ftp_client()
 void ftp_client::UserHandler()
 {
 	char command[STR_LENGTH];
-	this->Login(_T("127.0.0.1"));
+	this->Help();
 	do
 	{
 		cout << "ftp> ";
@@ -33,6 +33,7 @@ void ftp_client::UserHandler()
 			this->_pSocket->Close();
 			this->_pSocket->Create();
 			this->Login();
+			this->getIPAddr();
 			break;
 		case CODE_LS:
 			this->Ls();
@@ -78,6 +79,9 @@ void ftp_client::UserHandler()
 			break;
 		case CODE_ACTIVE:
 			this->Active();
+			break;
+		case CODE_HELP:
+			this->Help();
 			break;
 		case CODE_QUIT:
 			this->Quit();
@@ -127,6 +131,8 @@ int ftp_client::CommandHandler(char command[])
 		return CODE_QUIT;
 	if (!strcmp(command, "exit"))
 		return CODE_QUIT;
+	if (!strcmp(command, "help"))
+		return CODE_HELP;
 	return CODE_ERROR;
 }
 
@@ -293,6 +299,7 @@ bool ftp_client::Put(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 		dBuffer.close();
 		dBuffer.open("dataBuffer.dat", ios::in | ios::out | ios::trunc | ios::binary);
 	}
+	//Input filename
 	if (src_filename == NULL)
 	{
 		src_filename = new char[STR_LENGTH];
@@ -308,6 +315,7 @@ bool ftp_client::Put(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 		cin >> dest_filename;
 	}
 
+	//Read file
 	fstream fout;
 	fout.open(src_filename, ios::in | ios::binary);
 
@@ -337,6 +345,7 @@ bool ftp_client::Put(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 	cout << "ftp: Read " << dBuffer.tellg() << " bytes\n";
 	memset(buf, 0, sizeof buf);
 	sprintf(buf, "STOR %s\r\n", dest_filename);
+	//Call Transfer function
 	if (isPassive == 0)
 	{
 		if (!this->dataTvAM(UPSTREAM)) return FALSE;
@@ -364,6 +373,7 @@ bool ftp_client::Get(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 		dBuffer.close();
 		dBuffer.open("dataBuffer.dat", ios::in | ios::out | ios::trunc | ios::binary);
 	}
+	//Input filename
 	if (src_filename == NULL)
 	{
 		src_filename = new char[STR_LENGTH];
@@ -380,6 +390,7 @@ bool ftp_client::Get(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 	}
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "RETR %s\r\n", src_filename);
+	//Call transfer function
 	if (isPassive == 0)
 	{
 		if (!this->dataTvAM(DOWNSTREAM)) return FALSE;
@@ -388,6 +399,7 @@ bool ftp_client::Get(char src_filename[STR_LENGTH], char dest_filename[STR_LENGT
 	{
 		if (!this->dataTvPM(DOWNSTREAM)) return FALSE;
 	}
+	//Write file
 	fstream fin;
 	fin.open(dest_filename, ios::out | ios::binary | ios::trunc);
 
@@ -494,7 +506,6 @@ bool ftp_client::MDel(char filenames[STR_LENGTH])
 
 	if (filenames == NULL)
 	{
-		//char filenames[STR_LENGTH];
 		filenames = new char[STR_LENGTH];
 		cin.ignore();
 		cout << "Filenames: ";
@@ -566,6 +577,7 @@ bool ftp_client::Lcd(char directory[STR_LENGTH])
 	}
 
 	cout << dirbuf << endl;
+	delete[]directory;
 	return TRUE;
 }
 
@@ -610,6 +622,17 @@ bool ftp_client::Pwd()
 	return TRUE;
 }
 
+void ftp_client::Help()
+{
+	cout << ">> commands:\n";
+	cout << setw(30) << left << "open" << setw(30) << left << "mget" << setw(30) << left << "rmdir" << endl;
+	cout << setw(30) << left << "ls" << setw(30) << left << "cd" << setw(30) << left << "pwd" << endl;
+	cout << setw(30) << left << "dir" << setw(30) << left << "lcd" << setw(30) << left << "passive" << endl;
+	cout << setw(30) << left << "put" << setw(30) << left << "delete" << setw(30) << left << "active" << endl;
+	cout << setw(30) << left << "get" << setw(30) << left << "mdelete" << setw(30) << left << "quit" << endl;
+	cout << setw(30) << left << "mput" << setw(30) << left << "mkdir" << setw(30) << left << "exit" << endl;
+}
+
 void ftp_client::Passive()
 {
 	this->isPassive = 1;
@@ -632,6 +655,7 @@ ftp_client::~ftp_client()
 {
 	_pSocket->Close();
 	delete _pSocket;
+	delete[]m_IPAddr;
 }
 
 bool ftp_client::SendCommand()
@@ -649,21 +673,32 @@ bool ftp_client::dataTvAM(bool stream)
 {
 	CSocket dtSocket, tmpSock;
 	CString dtIPAddr; UINT dtPort;
-	
+	int LcIP[4];
+
 	char t_buf[BUFSIZ + 1];
 	sprintf(t_buf, "%s", buf);
 
-	if (dtSocket.Create(0U, SOCK_STREAM, _T("127.0.0.1")) == 0) return FALSE;
+	if (dtSocket.Create() == 0) return FALSE;
 	if (dtSocket.Listen(5) == 0) return FALSE;
 
 	if (dtSocket.GetSockName(dtIPAddr, dtPort) == 0) return FALSE;
+	//CT2A ascii(dtIPAddr);
+	//TRACE(_T("ASCII: %S\n"), ascii.m_psz);
+	//cout << ascii << endl;
 	int x = dtPort / 256;
 	int y = dtPort % 256;
 	memset(buf, 0, BUFSIZE);
-	sprintf(buf, "PORT 127,0,0,1,%d,%d\r\n", x, y);
-	if (this->SendCommand() == FALSE) return FALSE;
-	if (!checkFTPCode(200)) return FALSE;
-
+	sprintf(buf, "PORT %d,%d,%d,%d,%d,%d\r\n", m_IPAddr[0], m_IPAddr[1], m_IPAddr[2], m_IPAddr[3], x, y);
+	if (this->SendCommand() == FALSE)
+	{
+		dtSocket.Close();
+		return FALSE;
+	}
+	if (!checkFTPCode(200))
+	{
+		dtSocket.Close();
+		return FALSE;
+	}
 	memset(buf, 0, BUFSIZE);
 	sprintf(buf, "%s", t_buf);
 	_pSocket->Send(buf, BUFLEN, 0);
@@ -674,7 +709,6 @@ bool ftp_client::dataTvAM(bool stream)
 		_pSocket->Receive(buf, BUFSIZ, 0);
 		cout << buf;
 		cout << "ftp: Error! Check your command or filename(s)!\n";
-		tmpSock.Close();
 		dtSocket.Close();
 		return FALSE;
 	}
@@ -682,7 +716,6 @@ bool ftp_client::dataTvAM(bool stream)
 	memset(buf, 0, BUFSIZE);
 	if (dtSocket.Accept(tmpSock) == 0)
 	{
-
 		tmpSock.Close();
 		dtSocket.Close();
 		return FALSE;
@@ -725,12 +758,7 @@ bool ftp_client::dataTvAM(bool stream)
 	dtSocket.Close();
 	memset(buf, 0, BUFSIZE);
 	Sleep(200);
-	if (_pSocket->Receive(buf, BUFSIZ, 0) == SOCKET_ERROR)
-	{
-		tmpSock.Close();
-		dtSocket.Close();
-		return FALSE;
-	}
+	if (_pSocket->Receive(buf, BUFSIZ, 0) == SOCKET_ERROR) return FALSE;
 	cout << buf;
 	return TRUE;
 }
@@ -746,8 +774,8 @@ bool ftp_client::dataTvPM(bool stream)
 	sprintf(t_buf, "%s", buf);
 
 	sprintf(buf, "PASV\r\n");
-	if (!this->SendCommand()) return FALSE;
-	if (!checkFTPCode(227)) return FALSE;
+	if (this->SendCommand() == FALSE) return FALSE;
+	if (checkFTPCode(227) == FALSE) return FALSE;
 	
 	sscanf(buf, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)\r\n", &IPAddr[0], &IPAddr[1], &IPAddr[2], &IPAddr[3], &Port[0], &Port[1]);
 	wsprintf(SrvIP, _T("%d.%d.%d.%d"), IPAddr[0], IPAddr[1], IPAddr[2], IPAddr[3]);
@@ -818,4 +846,15 @@ bool ftp_client::checkFTPCode(int code)
 		return FALSE;
 	}
 	return TRUE;
+}
+
+void ftp_client::getIPAddr()
+{
+	CString IPAddr; UINT Port;
+	int * iIPAddr = new int[4];
+	_pSocket->GetSockName(IPAddr, Port);
+	CT2A cIPAddr(IPAddr);
+	TRACE(_T("ASCII: %S\n"), cIPAddr.m_psz);
+	sscanf(cIPAddr, "%d.%d.%d.%d", &iIPAddr[0], &iIPAddr[1], &iIPAddr[2], &iIPAddr[3]);
+	this->m_IPAddr = iIPAddr;
 }

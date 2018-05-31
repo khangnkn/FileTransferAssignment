@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <direct.h>
+#include <iomanip>
 using namespace std;
 
 #define STR_LENGTH 256
@@ -32,6 +33,7 @@ using namespace std;
 #define CODE_PASSIVE 14
 #define CODE_ACTIVE 142
 #define CODE_QUIT 15
+#define CODE_HELP 16
 
 class ftp_client
 {
@@ -40,7 +42,7 @@ private:
 	char buf[BUFSIZ + 1];
 	bool isPassive;
 	fstream dBuffer;
-
+	int * m_IPAddr;
 public:
 	ftp_client();
 	void UserHandler();
@@ -59,6 +61,7 @@ public:
 	bool Mkdir(char directory[STR_LENGTH] = NULL);
 	bool Rmdir(char directory[STR_LENGTH] = NULL);
 	bool Pwd();
+	void Help();
 	void Passive();
 	void Active();
 	bool Quit();
@@ -69,5 +72,6 @@ private:
 	bool dataTvPM(bool stream);
 	int CommandHandler(char command[]);
 	bool checkFTPCode(int code);
+	void getIPAddr();
 };
 

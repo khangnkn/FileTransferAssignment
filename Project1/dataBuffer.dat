@@ -1,10 +1,11 @@
-a.docx
-a.exe
-a.jpg
-a.mp3
-a.pdf
-a.rar
-a.txt
-film.mp4
-khang
-New Text Document.txt
+-rw-r--r-- 1 ftp ftp       13185873 May 26 22:42 a.docx
+-rwxr-xr-x 1 ftp ftp       63062360 May 26 22:42 a.exe
+-rw-r--r-- 1 ftp ftp        7167760 May 26 22:42 a.jpg
+-rw-r--r-- 1 ftp ftp        4025103 May 26 22:43 a.mp3
+-rw-r--r-- 1 ftp ftp        1791174 May 26 22:42 a.pdf
+-rw-r--r-- 1 ftp ftp         151631 May 26 22:43 a.rar
+-rw-r--r-- 1 ftp ftp             97 May 26 22:43 a.txt
+-rw-r--r-- 1 ftp ftp     1466728119 May 30 19:36 film.mp4
+drwxr-xr-x 1 ftp ftp              0 May 30 12:53 khang
+-rw-r--r-- 1 ftp ftp        1791174 May 30 21:16 khang.pdf
+-rw-r--r-- 1 ftp ftp             48 May 26 00:55 New Text Document.txt
