@@ -9,6 +9,7 @@ ftp_client::ftp_client()
 	memset(buf, 0, BUFSIZE);
 	_pSocket->Create();
 	isPassive = 0;
+	m_IPAddr = NULL;
 }
 /*Process user interface
 > Receive user commands
@@ -85,6 +86,7 @@ void ftp_client::UserHandler()
 			break;
 		case CODE_QUIT:
 			this->Quit();
+			system("pause");
 			return;
 		}
 	} while (TRUE);
@@ -655,7 +657,8 @@ ftp_client::~ftp_client()
 {
 	_pSocket->Close();
 	delete _pSocket;
-	delete[]m_IPAddr;
+	if(m_IPAddr != NULL)
+		delete[]m_IPAddr;
 }
 
 bool ftp_client::SendCommand()
